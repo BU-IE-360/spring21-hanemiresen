@@ -2,7 +2,7 @@
 title: "Interesting Forecasting Applications with R"
 author: "Emirhan Esen - IE360 - Spring 2021"
 ---
-```{r,echo=FALSE,results="hide"}
+```{r,echo=FALSE,results="hide",warning=FALSE}
 library(knitr)
 opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
 ```
