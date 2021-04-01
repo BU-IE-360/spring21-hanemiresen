@@ -7,7 +7,7 @@ library(knitr)
 opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
 ```
 
-```{r,echo=TRUE,eval=FALSE,warning=FALSE}
+```{r,echo=FALSE,eval=FALSE,warning=FALSE}
 rmarkdown::render("/home/baydogan/Courses/IE360/Guidelines/example_homework_0.Rmd",output_format="pdf_document")
 rmarkdown::render("/home/baydogan/Courses/IE360/Guidelines/example_homework_0.Rmd",output_format="html_document")
 ```
