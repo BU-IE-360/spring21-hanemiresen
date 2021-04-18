@@ -1,0 +1,156 @@
+---
+title: "HW1"
+author: "Emirhan Esen"
+date: "18 04 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(EVDS)
+library(data.table)
+library(ggplot2)
+set_evds_key("5PcQDek0z1")
+
+```
+
+# 1.Intro
+Are house sales statistics related to housing unit prices, housing interest rates for bank loans, and inflation rate? In this homework, I tried to make observations that might answer this question. Two different data source was used which are CBRT’s Electronic Data Delivery System and Google Trends. I took the following four different time series which are collected at a monthly frequency from 01/2018 to 01/2021 from the EVDS.
+-Housing Unit Prices for Turkey 
+-Weighted Average Housing Interest Rates For Banks Loans
+-Consumer Price Index
+-House Sales Statistics - Mortgaged sales in Turkey
+Then, I downloaded the search volume of three keywords which are "konut kredisi" , "emlak" , "enflasyon" from Google Trends for specified dates. 
+
+# 2. Data Manipulation
+I imported data from EVDS by using the EVDS package (get_series()) but the data was messy and not readable. After the necessary manipulations, I created four data tables for visualization. The data that I get from Google Trends was more readable. After the csv files were read by the R studio, I just converted to the character data column to the date column.  
+
+```{r, echo=FALSE, warning=F, eval=FALSE}
+hosalesdata <- as.data.table(get_series(c("TP.AKONUTSAT2.TOPLAM"), start_date = "01-01-2018", end_date = "01-01-2021"))
+
+housingdata <- as.data.table(get_series(c("TP.KTF12"), start_date = "01-01-2018", end_date = "01-01-2021"))
+
+priceindata <- as.data.table(get_series(c("TP.FG.J0"), start_date = "01-01-2017", end_date = "01-01-2021"))
+
+housunitpr <- as.data.table(get_series(c("TP.TCBF01.TURKIYE"), start_date = "01-01-2018", end_date = "01-01-2021"))
+
+hosalesdata[,Date:=as.Date.POSIXct(as.numeric(items.UNIXTIME))][, UNIXTIME:= NULL]
+fwrite(hosalesdata, ipoevsatis, col.names=T, row.names=F)
+
+housingdata[,Date:=as.Date.POSIXct(as.numeric(items.UNIXTIME))][, UNIXTIME:= NULL]
+fwrite(housingdata, konutfaiz, col.names=T, row.names=F)
+
+housunitpr[,Date:=as.Date.POSIXct(as.numeric(items.UNIXTIME))][, UNIXTIME:= NULL]
+fwrite(housunitpr, konutbf, col.names=T, row.names=F)
+
+priceindata[,Date:=as.Date.POSIXct(as.numeric(items.UNIXTIME))][, UNIXTIME:= NULL]
+cpidif <- priceindata[,.(diff(cpi, lag=12))]
+inflatrate <- 100*cpidif/priceindata[ , cpi ]
+fwrite(inflatrate, InfR, col.names=T, row.names=F)
+
+```
+
+```{r, echo=FALSE, warning=F}
+hup <- fread("konutbf.csv")
+hloan <- fread("konutfaiz.csv")
+cpidata <- fread("CPI.csv")
+infrate <- fread("InfR.csv")
+morthous <- fread("ipoevsatis.csv")
+kkGT <- fread("konutkredisiGT.csv")
+infGT <- fread("infGTrm.csv")
+emlakGT <- fread("emlak.csv")
+
+tarihler <- as.Date.character(kkGT$Hafta,format = c("%Y-%m-%d"))
+tarihler2 <- as.Date.character(emlakGT$Hafta,format = c("%Y-%m-%d"))
+tarihler3 <- as.Date.character(infGT$Hafta,format = c("%Y-%m-%d"))
+kkdata <- data.frame(tarihler,kkGT$konutkredisi)
+infdata <- data.frame(tarihler3,infGT$enflasyon)
+emlakdata <- data.frame(tarihler2,emlakGT$emlak)
+
+```
+
+# 3. Visual Analysis
+
+## 3.1 Housing Unit Prices for Turkey
+
+Housing unit prices are regularly announced by the Republic of Turkey Ministry of Environment and Urbanization, taking into account various metrics. Housing unit prices are directly affected by the prices of construction materials such as iron, cement, steel, and brick etc.. Many of these materials are imported and therefore traded in dollars or euros. Therefore, changes in exchange rates have a straight effect on housing unit prices. The following plot shows how the housing unit prices change over time.
+
+```{r, echo=FALSE, warning=F}
+
+hounpr <- ggplot(hup,aes(x=Date , y=HousingUP , group =1 , )) + geom_line() + labs(title = "Housing Unit Prices for Turkey between 2018-2021", x = "Date", y = "Housing Unit Prices - TL/sq m") + theme_minimal() +  theme(axis.text.x = element_text(angle = 90))
+
+hounpr
+
+```
+
+## 3.2 Weighted Average Housing Interest Rates For Banks Loans
+
+What is Mortgaged House Sales and Houme Loan? By paying installments, housing loans can be taken by applying to banks to become a homeowner in the long term.  The bank that gives the home loan mortgages the real estate until the loan debt is fully paid. In cases where the debt of the house is not paid, the bank has the right to sell the real estate. The following plot shows how the Housing Interest Rates change over time. 
+
+```{r, echo=FALSE, warning=F}
+
+hloanp <- ggplot(hup,aes(x=Date , y=HousingUP , group =1 , )) + geom_line() + labs(title = "Weighted Average Housing Interest Rates For Banks Loans between 2018-2021", x = "Date", y = "Interest Rates (TRY) %") + theme_minimal() +  theme(axis.text.x = element_text(angle = 90))
+
+hloanp
+```
+
+It can be clearly seen that the interest rates reached very high levels in August and September 2018. Shortly before that date, the Turkish lira began to depreciate rapidly, under the influence of political tensions with the United States. Central Bank of the Republic of Turkey increased the interest rates to prevent the currency from depreciating and take room for maneuver. It can be predicted that this situation caused a decrease in home sales.
+
+I examined the following plot showing the search volume of the keyword "konut kredisi" to see if these changes had an impact on people's searches.
+
+```{r, echo=FALSE, warning=F}
+
+konutkredisigt <- ggplot(kkdata,aes(x=tarihler , y=kkGT.konutkredisi , group =1 , )) + geom_line() + labs(title = "Search Volumes of konut kredisi in Turkey between 2018-2021 ", x = "Date", y = "Search Volumes") + theme_minimal() +  theme(axis.text.x = element_text(angle = 90)) + scale_x_date(date_breaks = "1 months")
+
+konutkredisigt
+```
+
+There was an abnormal increase in June-July 2020. Public banks were providing housing loans at a rate of monthly 0.69 which is relatively less than inflation. It means that the real interest rate was negative. Housing purchased with a loan would maintain its value in the long run. On the other hand, the amount of debt was decreasing in real terms as the money depreciated. In this case, buying a house became a very attractive option.
+
+## 3.3 Inflation Rate
+
+Inflation is a measure of the rate of changing prices of goods and services in an economy. Inflation rate is one of the most important economic variables because it shows the change in the economic power of the country. There are different ways to calculate inflation rate. In this study, I calculated it using the rate of change in price indices compared to the same month of the last year. The following plot shows how the inflation rate sales change over time. 
+
+```{r, echo=FALSE, warning=F}
+
+infratep <- ggplot(infrate,aes(x=Date , y= InfRate , group =1 , )) + geom_line() + labs(title = "Inflation Rate between 2018-2021", x = "Date", y = "Inflation Rate") + theme_minimal() +  theme(axis.text.x = element_text(angle = 90))
+
+infratep
+
+```
+It can be clearly seen that the inflation rates has risen rapidly in August and September 2018. This increase again related to the same topics mentioned above section. The following plot showing the search volume of the keyword "enflasyon" to see if these changes had an impact on people's searches
+
+```{r, echo=FALSE, warning=F , eval=T}
+
+infgtgraph <- ggplot(infdata ,aes(x=tarihler3 , y=infGT.enflasyon , group =1 , )) + geom_line() + labs(title = "Search Volumes of emlak in Turkey between 2018-2021 ", x = "Date", y = "Search Volumes") + theme_minimal() +  theme(axis.text.x = element_text(angle = 90)) + scale_x_date(date_breaks = "1 months")
+
+infgtgraph
+
+
+```
+
+
+## 3.4 House Sales Statistics - Mortgaged sales in Turkey
+
+Considering all the previous plots and topics, I examined the House Sales Statistics. The following plots shows how the mortgaged house sales change over time and the search volume of the keyword "emlak" to see if these changes had an impact on people's searches. 
+
+```{r, echo=FALSE, warning=F}
+
+houssales <- ggplot(morthous,aes(x=Date , y= EvSat , group =1 , )) + geom_line() + labs(title = "House Sales Statistics in Turkey - Mortgaged sales between 2018-2021", x = "Date", y = "House Sales") + theme_minimal() +  theme(axis.text.x = element_text(angle = 90))
+
+
+houssales
+
+```
+
+```{r, echo=FALSE, warning=F}
+
+emlakgtgraph <- ggplot(emlakdata ,aes(x=tarihler , y=emlakGT.emlak , group =1 , )) + geom_line() + labs(title = "Search Volumes of emlak in Turkey between 2018-2021 ", x = "Date", y = "Search Volumes") + theme_minimal() +  theme(axis.text.x = element_text(angle = 90)) + scale_x_date(date_breaks = "1 months")
+
+emlakgtgraph
+
+```
+
+There seems to be no trend at first sight. An abnormal increase is noticeable in June and July 2020. There may be several reasons for this: the depreciation of the Turkish lira as a result of economic fluctuations in the country, infeasible monetary policies, the inadequacy of interest rate adjustments, or housing loans with very low-interest rate.For example, public banks were providing housing loans at a rate of monthly 0.69. When this rate was compared to inflation at that time, real interest was negative. While the borrowed money immediately turned into an asset and maintained its value, the amount of debt was decreasing in real terms as the money depreciated. In this case, buying a house became a very attractive option. I want to draw attention to another point.There was an important decline that started in June 2018 and lasted for 8 months. In those days, some political and economic issues which are mentioned earlier have caused sharp fluctuations in Turkey's economy. International sanctions have negatively affected exchange rates and then depreciation of TL was accelerated. This depreciation, which brought inflation, was followed by the rise in interest rates. As a result, house sales fell rapidly, both because interest rates were high and people preferred money in liquid form in an environment of uncertainty.  
+
+
