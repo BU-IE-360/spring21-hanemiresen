@@ -89,7 +89,7 @@ What is Mortgaged House Sales and Houme Loan? By paying installments, housing lo
 
 ```{r, echo=FALSE, warning=F}
 
-hloanp <- ggplot(hup,aes(x=Date , y=HousingUP , group =1 , )) + geom_line() + labs(title = "Weighted Average Housing Interest Rates For Banks Loans between 2018-2021", x = "Date", y = "Interest Rates (TRY) %") + theme_minimal() +  theme(axis.text.x = element_text(angle = 90))
+hloanp <- ggplot(hloan,aes(x=Date , y=Faiz , group =1 , )) + geom_line() + labs(title = "Weighted Average Housing Interest Rates For Banks Loans between 2018-2021", x = "Date", y = "Interest Rates (TRY) %") + theme_minimal() +  theme(axis.text.x = element_text(angle = 90))
 
 hloanp
 ```
