@@ -9,5 +9,5 @@
 
 ## Week 2
 [Homework 2](files/HW2) is here.
-[Homework 2 code](files/HW2.rmd) is here.
+[Homework 2 code](files/HW2code) is here.
 
