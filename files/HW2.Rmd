@@ -1,0 +1,161 @@
+---
+title: "HW2 Time Series Regression for Predicting Mortgaged House Sales"
+author: "Emirhan Esen"
+date: "05 05 2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+The aim of this homework is to understand and forecast the Mortgaged House Sales Statistics in Turkey at a monthly level. What is Mortgaged House Sales and House Loan? By paying installments, housing loans can be taken by applying to banks to become a homeowner in the long term. The bank that gives the home loan mortgages the real estate until the loan debt is fully paid. In cases where the debt of the house is not paid, the bank has the right to sell the real estate. Are mortgaged house sales statistics related to housing interest rates for bank loans and/or Consumer Tendency survey of the probability of buying or building a home? I try to build a time series regression model for forecasting next month’s value of the mortgaged house sales. I downloaded the related data from CBRT’s Electronic Data Delivery System and they are collected at a monthly frequency from 01/2013 to 03/2021. 
+
+# Data Manipulation and Visualization
+
+I downloaded the following time series and survey from CBRT’s Electronic Data Delivery System:
+1- House Sales Statistics - Turkey - - Mortgaged sales(TURKSTAT) - Level
+2- Housing (TRY)(Flow Data, %) - Level
+3- The probability of buying or building a home (over the next 12 months) - Level
+All of them are collected at a monthly frequency from 01/2013 to 03/2021. I put them in a single .csv file which has four columns. 
+
+```{r, echo=T, eval=T ,message = FALSE}
+require(data.table)
+require(lubridate)
+require(ggplot2)
+require(forecast)
+require(GGally)
+
+#data reading
+salesdata=fread("alldata.csv")
+str(salesdata)
+
+```
+
+I converted the "Tarih" column to "date" column as a date class by using lubridate package. Then I deleted the "Tarih" column which class is character.
+
+```{r, echo=T, eval=TRUE,warning = FALSE}
+salesdata[,date := ym(Tarih) ]
+salesdata[,Tarih := NULL]
+
+ggplot(salesdata) + aes(x=date , y=sales) + geom_line() + ylim(3000,140000) + xlab('Date') +
+  ylab('Sales')
+
+```
+
+Firstly I checked the correlation between sales and other variables. There is a high correlation with bank loans. So, I started with it. Then, I add the survey data and trend to linear model. In every step, I observed F-statistics, R-squared values, Breusch-Godfrey test and residual's mean and variance. Then I made predictions with the related model and plot them. Also, I checked if the salesdata has any correlation with months and intercept point. I did not add them to the final linear model because they don't have a strong correlation.
+
+```{r, echo=T, eval=TRUE,warning = FALSE}
+# multi-graph, correlation
+ggpairs(salesdata)
+```
+
+```{r, echo=T, eval=TRUE,warning = FALSE}
+# adding "kredi" variable to the model
+ts_reg=lm(sales~kredi,salesdata)
+summary(ts_reg)
+checkresiduals(ts_reg , lag= 12)
+
+salesdata[,p_kredi:=predict(ts_reg,salesdata)]
+
+ggplot(salesdata, aes(x=date)) + 
+  geom_line(aes(y=sales,color='real')) + 
+  geom_line(aes(y=p_kredi, color='trend'))+ 
+  xlab('Date') +
+  ylab('Sales')
+
+
+```
+
+```{r, echo=T, eval=TRUE,warning = FALSE}
+# adding "niyet" variable to the model
+ts_reg=lm(sales~kredi+niyet,salesdata)
+summary(ts_reg)
+checkresiduals(ts_reg , lag= 12)
+
+salesdata[,p_kredi_niyet:=predict(ts_reg,salesdata)]
+
+ggplot(salesdata, aes(x=date)) + 
+  geom_line(aes(y=sales,color='real')) + 
+  geom_line(aes(y=p_kredi_niyet, color='trend'))+ 
+  xlab('Date') +
+  ylab('Sales')
+
+```
+
+```{r, echo=T, eval=TRUE,warning = FALSE}
+# adding "trend" variable to the model
+salesdata[,trend := 1:.N]
+head(salesdata)
+tail(salesdata)
+ts_reg=lm(sales~kredi+niyet+trend,salesdata)
+summary(ts_reg)
+checkresiduals(ts_reg , lag= 12)
+salesdata[,p_kredi_niyet_trend:=predict(ts_reg,salesdata)]
+
+ggplot(salesdata, aes(x=date)) + 
+  geom_line(aes(y=sales,color='real')) + 
+  geom_line(aes(y=p_kredi_niyet_trend, color='trend'))+ 
+  xlab('Date') +
+  ylab('Sales')
+
+```
+
+
+```{r, echo=T, eval=TRUE,warning = FALSE}
+#adding month information as a variable
+salesdata[,month := as.character(lubridate::month(date, label = T))]
+ts_reg2=lm(sales~kredi+niyet+trend+month,salesdata)
+summary(ts_reg2)
+
+salesdata[, trend_constant_monthly_sales := predict(ts_reg2,salesdata)]
+ggplot(salesdata, aes(x=date)) + 
+  geom_line(aes(y=sales,color='real')) + 
+  geom_line(aes(y=p_kredi_niyet_trend, color='trend'))+ 
+  xlab('Date') +
+  ylab('Sales')
+```
+
+```{r, echo=T, eval=TRUE,warning = FALSE}
+#without intercept
+ts_reg3=lm(sales~-1+kredi+niyet+trend,salesdata)
+summary(ts_reg3)
+checkresiduals(ts_reg , lag= 12)
+salesdata[,p_kredi_niyet_trend_woint:=predict(ts_reg3,salesdata)]
+
+ggplot(salesdata, aes(x=date)) + 
+  geom_line(aes(y=sales,color='real')) + 
+  geom_line(aes(y=p_kredi_niyet_trend_woint, color='trend'))+ 
+  xlab('Date') +
+  ylab('Sales')
+```
+
+```{r, echo=T, eval=TRUE,warning = FALSE}
+#get forecasts for next month
+tail(salesdata)
+
+ggplot(salesdata, aes(x=date)) + 
+  geom_line(aes(y=sales,color='real')) + 
+  geom_line(aes(y=p_kredi_niyet_trend, color='trend'))+ 
+  xlab('Date') +
+  ylab('Sales')
+
+#only2021 
+ggplot(salesdata[year(date)>=2020], aes(x=date)) + 
+  geom_line(aes(y=sales,color='real')) + 
+  geom_line(aes(y=p_kredi_niyet_trend, color='predicted'))+ 
+  xlab('Date') +
+  ylab('Sales')
+
+salesdata$p_kredi_niyet_trend[.N]
+
+```
+
+
+# Conclusion
+
+The aim of this homework is to forecast the mortgaged house sales in April 2021. In order to make a preferable prediction, some relevant predictors were used which are a survey about  probability of buying or building a home, Housing(bank loan). All data comes from EVDS CBTS. After the necessary data manipulations, some time series objects were created and tested. With these studies, some correlations were observed between mortgaged house sales and bank loans, consumer surveys, and trend. In this way, the answer to the question asked at the beginning of the study was partially found. According to the last model, the next forecast of mortgaged house sales for April 2021 came out to be “15257”.
+
+
+

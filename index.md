@@ -7,3 +7,7 @@
 ## Week 1
 [Homework 1](files/HW1) is here.
 
+## Week 2
+[Homework 2](files/HW2) is here.
+[Homework 2 code](files/HW2.rmd) is here.
+
