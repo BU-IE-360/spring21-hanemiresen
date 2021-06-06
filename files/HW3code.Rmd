@@ -1,0 +1,254 @@
+---
+title: "IE360 HW3"
+author: "Emirhan Esen"
+date: "06 06 2021"
+output: html_document
+---
+
+```{r eval=TRUE,echo=FALSE,warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(lubridate)
+library(data.table)
+require(ggplot2)
+library(ggplot2)
+library(forecast)
+require(urca)
+library(urca)
+```
+
+## Introduction
+  In this study I try to understand and predict the tomorrow’s hourly electricity consumption of Turkey. The data gathered from EPİAŞ which present the consumption series to public. The consumption data cover from 1st of January 2016 to 20th of May 2021. Before start to analyze raw data I did some necessary data manipulations which make data more readable and usable.  Then I fit a suitable model and predictions for the next 14 days of electric consumptions.
+  
+  
+## Data preperation
+
+In this part, I made data importing and some manipulations. After read data as a csv file, "Tarih" column is converted from chracter to date class. Also, "Tüketim" columns is converted to numeric class and renamed. 
+
+
+```{r message=FALSE, warning=FALSE}
+consumptiondata=fread('Tuketim.csv')
+#str(consumptiondata)
+setnames(consumptiondata,3 , "Consumption")
+
+
+
+consumptiondata[,Consumption:=as.numeric(gsub(",", "", Consumption))]
+head(consumptiondata)
+
+consumptiondata[,Consumption := 1000*Consumption]
+consumptiondata[,datetime:=paste(Tarih,Saat)]
+
+consumptiondata[,datetime:=as.POSIXct(datetime, format= "%d.%m.%Y %H:%M" ,tz="UTC")]
+
+head(consumptiondata$datetime)
+
+```
+
+In order to take an overall idea and improve a better model, let make a fast look at the time series data plot. Then check the stationary of data, visualization show that data is not stationary. As expected, "Value of test-statistic is: 12.695" is greater than the all critical values so for now data is not stationary. 
+
+
+```{r warning=FALSE}
+ggplot(data=consumptiondata,aes(x=datetime,y=Consumption)) + geom_line(col = "black") + labs(title = "Electricity Consumption in Turkey", subtitle = " From 1st of January, 2016 till the 20th of May, 2021") 
+
+
+plot(acf(consumptiondata$Consumption, lag.max = 10,plot=FALSE),main=" ", xlab="Lag") 
+
+
+test=ur.kpss(consumptiondata$Consumption)
+summary(test)
+```
+
+## Decomposition of Data
+
+In this part I try to find possible types of seasonality exhibited by hourly electricity consumption. For that purpose, I made decomposition for the consumption series at different levels which are hourly, daily and monthly levels.
+
+# Hourly Decomposition
+
+To hourly decomposition I need to create a time series object with a frequency value of 24. In this way, I can see whether there is a pattern in hours of a day. 
+
+```{r message=FALSE, warning=FALSE}
+consumptionts_hr=ts(consumptiondata$Consumption,frequency = 24)
+
+consumptionts_hr_dec=decompose(consumptionts_hr)
+plot(consumptionts_hr_dec)
+acf(consumptionts_hr,na.action=na.pass)
+
+```
+As we can see there is a rapid seasonality in daily data and the variance seems stable. Also ACF shows that there is a seasonality effect. We should move to daily level.
+
+# Daily Decomposition
+
+```{r message=FALSE, warning=FALSE}
+consumptionts_dy=ts(consumptiondata$Consumption,frequency = 24*7)
+
+consumptionts_dy_dec=decompose(consumptionts_dy)
+plot(consumptionts_dy_dec)
+acf(consumptionts_dy,na.action=na.pass)
+```
+To daily decomposition I need to create a time series object with a frequency value of 24*7. Try to determine there is a 7 days pattern or not. Both the hours and the days  define the seasonality which is more sense.
+
+# Monthly Decomposition
+```{r message=FALSE, warning=FALSE}
+consumptionts_mo=ts(consumptiondata$Consumption,frequency = 24*7*52)
+
+consumptionts_mo_dec=decompose(consumptionts_mo)
+plot(consumptionts_mo_dec)
+acf(consumptionts_mo,na.action=na.pass)
+```
+To monthly decomposition I need to create a time series object with a frequency value of 24*7*52. Try to determine there is a 12 months pattern or not. Both the hours, days and months define the seasonality. 
+
+## Decomposition of Daily Data
+
+Let's choose the decomposed data which frequency is 168. Again, it means that both the hour and the day of the observation define the
+seasonality. I decompose this data by using "decompose()" function. It gives automatically trend and seasonality cycle for given frequency.
+
+```{r message=FALSE, warning=FALSE}
+deseasonalized=consumptionts_dy_dec$x- consumptionts_dy_dec$seasonal
+plot(deseasonalized)
+detrended = deseasonalized-consumptionts_dy_dec$trend
+plot(detrended)
+
+acf(detrended,na.action=na.pass)
+pacf(detrended,na.action=na.pass)
+
+acf(detrended,na.action=na.pass,168)
+pacf(detrended,na.action=na.pass,168)
+
+test2=ur.kpss(detrended) 
+summary(test2)
+```
+As mentioned before, trend and seasonality components shows some important features. For example, there are seasonal increases during the summer months and winter months. It can be related to weather temperature. When the weather temperature make a pick, electricity consumption of that day relatively high. Also, similar kind of seasonality exist in the daily usage. Electricity consumption is increases from 5-6 am to noon.
+
+
+## AR Models
+
+Now, let's consider to autocorrelation and partial autocorrelation function in order to choose a preferable p values. 
+
+```{r message=FALSE, warning=FALSE}
+ar1 = arima(detrended, order = c(1,0,0))
+ar2 = arima(detrended, order = c(2,0,0))
+ar3 = arima(detrended, order = c(3,0,0))
+ar4 = arima(detrended, order = c(4,0,0))
+ar5 = arima(detrended, order = c(5,0,0))
+c(ar1=AIC(ar1), ar2=AIC(ar2), ar3=AIC(ar3), ar4=AIC(ar4), ar5=AIC(ar5))
+min(c(ar1=AIC(ar1), ar2=AIC(ar2), ar3=AIC(ar3), ar4=AIC(ar4), ar5=AIC(ar5)))
+```
+
+The minimum AIC value comes from ar4, so I choose p=4 and continue with MA mdels.
+
+#MA models
+
+Also, we can find a preferable q value by using moving average method. As expected, ma5 is the minimum solution. We can increase the q value such as ma for 10 and it gives a better value but this option is very time consuming. So we go on with q=5 
+
+```{r message=FALSE, warning=FALSE}
+ma1 = arima(detrended, order = c(0,0,1))
+ma2 = arima(detrended, order = c(0,0,2))
+ma3 = arima(detrended, order = c(0,0,3))
+ma4 = arima(detrended, order = c(0,0,4))
+ma5 = arima(detrended, order = c(0,0,5))
+c(ma1=AIC(ma1), ma2=AIC(ma2), ma3=AIC(ma3), ma4=AIC(ma4), ma5=AIC(ma5))
+min(c(ma1=AIC(ma1), ma2=AIC(ma2), ma3=AIC(ma3), ma4=AIC(ma4), ma5=AIC(ma5))
+)
+```
+
+# ARMA Models
+
+We have decided to optimal AR and MA values as ar=4 and m=5. Now, I try to combine these two parameter and find the optimum model.
+
+```{r message=FALSE, warning=FALSE}
+model1 = arima(detrended, order = c(4,0,5))
+AIC(model1)
+
+model2 = arima(detrended, order = c(4,0,4))
+AIC(model2)
+
+model3 = arima(detrended, order = c(3,0,4))
+AIC(model3)
+```
+Finally, ARIMA(4,0,4) is better than ARIMA(4,0,5) in terms of AIC. So, I prefer to use ARIMA(4,0,4) - Model2 because of both AIC value and less complexity of model. 
+
+
+## Forecasting
+First, prepare the transformed model than make predictions. Then get rid of NA and lags.
+
+```{r message=FALSE, warning=FALSE}
+model_fit= detrended - residuals(model2)
+model_fitted_transformed <- model_fit+consumptionts_dy_dec$trend+consumptionts_dy_dec$seasonal
+consumptiondata[,fitted:=model_fitted_transformed]
+
+#consumptiondata$fitted
+```
+
+```{r message=FALSE, warning=FALSE}
+Res_fit = residuals((model2))
+consumptiondata[,fit_res:=Res_fit]
+
+na_84=mean(consumptiondata$fitted[85:168])
+na_84_res=mean(consumptiondata$fit_res[85:168])
+
+consumptiondata$fitted[1:84]= na_84
+consumptiondata$fit_res[1:84]=na_84_res
+
+test_set = consumptiondata[(.N-359):.N]
+
+res_tes=predict(model2,n.ahead = 84)$pred
+
+#tail(consumptionts_dy_dec$trend[!is.na(consumptionts_dy_dec$trend)],84)
+
+endt_84 = tail(consumptionts_dy_dec$trend[!is.na(consumptionts_dy_dec$trend)],84)
+ends_84= tail(consumptionts_dy_dec$seasonal[!is.na(consumptionts_dy_dec$seasonal)],84)
+end_comb = res_tes+endt_84+ends_84
+
+consumptiondata$fitted[47125:47208]=end_comb
+
+ggplot(consumptiondata , aes(x=datetime) )  +
+  geom_line(aes(y=Consumption , col="actual")) +
+  geom_line(aes(y=fitted , col = "fitted"))
+
+```
+
+Focus on last two weeks. 
+
+```{r message=FALSE, warning=FALSE}
+#focus on 2 weeks
+ggplot(consumptiondata[datetime<='2020-05-20' & datetime>='2020-05-06'] , aes(x=datetime) )  +
+  geom_line(aes(y=Consumption , col="actual")) +
+  geom_line(aes(y=fitted , col = "fitted"))
+```
+
+```{r message=FALSE, warning=FALSE}
+actual = consumptiondata[datetime<='2020-05-20 23:00' & datetime>='2020-05-06 00:00' , Consumption ]
+forecast = consumptiondata[datetime<='2020-05-20 23:00' & datetime>='2020-05-06 00:00' , fitted ]
+forecast = as.numeric(forecast)
+error = abs(actual - forecast)
+
+percentage=error/consumptiondata[datetime<='2020-05-20 23:00' & datetime>='2020-05-06 00:00' , Consumption ]
+wape=(sum(percentage)/360)*100
+
+```
+Calculated mwape is 1.81.
+
+## Conclusion
+
+As a result, I worked on electricity consumption data and try to decompose it.  First, I try to decompose the data at different levels to understand the characteristics of the data. Then I choose the pattern at every 168 hours which means both the hour and the day of the observation define the seasonality. Then, we found best AR and MA parameters by making some trials. In different AR(p), MA(q), and ARMA(p,q) models, ARMA(4,4) gives the best result. Then we fitted a model with p=4 q=4 and made 14 days predictions. Finally, error measures and WMAPE are  calculated.  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
