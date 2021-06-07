@@ -13,6 +13,6 @@
 
 ## Week 3 
 [Homework 3](files/HW3) is here.
-[Homework 3 code](files/HW3code) is here.
+[Homework 3 code](files/HW3code.Rmd) is here.
 
 
