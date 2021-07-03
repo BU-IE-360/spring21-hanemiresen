@@ -17,8 +17,8 @@
 
 
 ## Homework 4-5
-[Homework 4-5](files/HW45) is here.
-[Homework 4-5 code](files/HW45code.Rmd) is here.
+[Homework 4-5](files/HW4-5) is here.
+[Homework 4-5 code](files/HW4-5code.Rmd) is here.
 
 ## Project
 [Project](files/Project-Report) is here.
